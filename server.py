@@ -18,7 +18,7 @@ def upload_image_to_s3(file, filename):
 
 def populate_simpledb():
     sdb_client.create_domain(DomainName=SDB_DOMAIN_NAME)
-    with open('Project-1-part-1/CSE546-SPRING-2025/Classification Results on Face Dataset (1000 images).csv', 'r', newline='') as csv_file:
+    with open('/Classification Results on Face Dataset (1000 images).csv', 'r', newline='') as csv_file:
         reader = csv.reader(csv_file)
         for row in reader:
             if not row:
