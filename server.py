@@ -25,9 +25,6 @@ def populate_simpledb():
                 continue 
             image_name = row[0].strip()
             prediction = row[1].strip()
-            print(image_name)
-            print(prediction)
-            print(image_name!="Image" and prediction!="Prediction")
             if image_name!="Image" and prediction!="Prediction":
                 sdb_client.put_attributes(DomainName=SDB_DOMAIN_NAME, ItemName=image_name, 
                     Attributes=[
