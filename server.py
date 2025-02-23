@@ -12,10 +12,6 @@ REGION = 'us-east-1'
 s3_client = boto3.client("s3", region_name=REGION)
 sdb_client = boto3.client("sdb", region_name=REGION)
 
-def upload_image_to_s3(file, filename):
-    s3_client.upload_fileobj(file, S3_BUCKET_NAME, filename)
-    return f"s3://{S3_BUCKET_NAME}/{filename}"
-
 def populate_simpledb():
     sdb_client.create_domain(DomainName=SDB_DOMAIN_NAME)
     with open('/home/ubuntu/cloud-computing/Classification Results on Face Dataset (1000 images).csv', 'r', newline='') as csv_file:
@@ -25,7 +21,7 @@ def populate_simpledb():
                 continue 
             image_name = row[0].strip()
             prediction = row[1].strip()
-            if image_name!="Image" and prediction!="Prediction":
+            if image_name!="Image" and prediction!="Results":
                 sdb_client.put_attributes(DomainName=SDB_DOMAIN_NAME, ItemName=image_name, 
                     Attributes=[
                         {
@@ -43,7 +39,7 @@ def handle_post():
     file_obj = request.files["inputFile"]
     filename = file_obj.filename.split('.')[0]
     try:
-        upload_image_to_s3(file_obj, filename)
+        s3_client.upload_fileobj(file_obj, S3_BUCKET_NAME, filename)
         response = sdb_client.get_attributes(DomainName=SDB_DOMAIN_NAME, ItemName=filename, ConsistentRead=True)
         if "Attributes" in response:
             for attr in response["Attributes"]:
