@@ -56,4 +56,4 @@ def auto_scaling():
             terminate_instance(running_instances[0])
 
 if __name__ == "__main__":
-    Thread(target=auto_scaling, daemon=True).start()
+    auto_scaling()
