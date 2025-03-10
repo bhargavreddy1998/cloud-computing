@@ -5,11 +5,11 @@ ASU_ID = "1226491476"
 REGION = 'us-east-1'
 AMI_ID = "ami-08951a8055a1ccc23"
 INSTANCE_TYPE = "t2.micro"
-SECURITY_GROUP = "your-security-group"  # Replace with your security group
-KEY_NAME = "your-key-pair"  # Replace with your key pair name
+SECURITY_GROUP = "app-tier-sg"
+KEY_NAME = "my-key-pair"
 MAX_INSTANCES = 15
 
-sqs_client = boto3.client("sqs", region_name=REGION)
+sqs_client = boto3.resource("sqs", region_name=REGION)
 ec2 = boto3.client("ec2", region_name=REGION)
 
 SQS_REQ_QUEUE_NAME = f"{ASU_ID}-req-queue"
