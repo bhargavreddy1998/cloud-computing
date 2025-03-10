@@ -3,18 +3,18 @@ from threading import Thread
 
 ASU_ID = "1226491476"
 REGION = 'us-east-1'
-AMI_ID = "ami-08951a8055a1ccc23"
+AMI_ID = "ami-04b4f1a9cf54c11d0"
 INSTANCE_TYPE = "t2.micro"
 SECURITY_GROUP = "app-tier-sg"
 KEY_NAME = "my-key-pair"
 MAX_INSTANCES = 15
 
 sqs_client = boto3.client("sqs", region_name=REGION)
-sqs_client1 = boto3.resource("sqs", region_name=REGION)
+sqs_resource = boto3.resource("sqs", region_name=REGION)
 ec2 = boto3.client("ec2", region_name=REGION)
 
 SQS_REQ_QUEUE_NAME = f"{ASU_ID}-req-queue"
-sqs_req_queue = sqs_client1.get_queue_by_name(QueueName=SQS_REQ_QUEUE_NAME)
+sqs_req_queue = sqs_resource.get_queue_by_name(QueueName=SQS_REQ_QUEUE_NAME)
 
 def get_message_count():
     response = sqs_client.get_queue_attributes(QueueUrl=sqs_req_queue.url,AttributeNames=['ApproximateNumberOfMessages'])
