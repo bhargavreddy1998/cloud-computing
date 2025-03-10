@@ -8,7 +8,7 @@ S3_OUTPUT_BUCKET = f"{ASU_ID}-out-bucket"
 S3_INPUT_BUCKET = f"{ASU_ID}-in-bucket"
 REGION = 'us-east-1'
 
-sqs_client = boto3.client("sqs", region_name=REGION)
+sqs_client = boto3.resource("sqs", region_name=REGION)
 s3_client = boto3.client("s3", region_name=REGION)
 sqs_resp_queue = sqs_client.get_queue_by_name(QueueName=SQS_RESP_QUEUE_NAME)
 sqs_req_queue = sqs_client.get_queue_by_name(QueueName=SQS_REQ_QUEUE_NAME)
@@ -37,7 +37,7 @@ def handle_image(filename):
 
 def retrieve_sqs_request():
     while True:
-        response = sqs_req_queue.receive_message(MaxNumberOfMessages=1, WaitTimeSeconds=5)        
+        response = sqs_req_queue.receive_messages(MaxNumberOfMessages=1, WaitTimeSeconds=5)        
         if 'Messages' in response:
             for message in response['Messages']:
                 try:
