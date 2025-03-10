@@ -11,7 +11,7 @@ SQS_RESP_QUEUE_NAME = f"{ASU_ID}-resp-queue"
 REGION = 'us-east-1' 
 
 s3_client = boto3.client("s3", region_name=REGION)
-sqs_client = boto3.client("sqs", region_name=REGION)
+sqs_client = boto3.resource("sqs", region_name=REGION)
 sqs_req_queue = sqs_client.get_queue_by_name(QueueName=SQS_REQ_QUEUE_NAME)
 sqs_resp_queue = sqs_client.get_queue_by_name(QueueName=SQS_RESP_QUEUE_NAME)
 
