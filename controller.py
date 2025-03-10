@@ -1,5 +1,5 @@
 import boto3
-import time
+from threading import Thread
 
 ASU_ID = "1226491476"
 REGION = 'us-east-1'
@@ -9,14 +9,15 @@ SECURITY_GROUP = "app-tier-sg"
 KEY_NAME = "my-key-pair"
 MAX_INSTANCES = 15
 
-sqs_client = boto3.resource("sqs", region_name=REGION)
+sqs_client = boto3.client("sqs", region_name=REGION)
+sqs_client1 = boto3.resource("sqs", region_name=REGION)
 ec2 = boto3.client("ec2", region_name=REGION)
 
 SQS_REQ_QUEUE_NAME = f"{ASU_ID}-req-queue"
-sqs_req_queue = sqs_client.get_queue_by_name(QueueName=SQS_REQ_QUEUE_NAME)
+sqs_req_queue = sqs_client1.get_queue_by_name(QueueName=SQS_REQ_QUEUE_NAME)
 
 def get_message_count():
-    response = sqs_req_queue.get_queue_attributes(AttributeNames=['ApproximateNumberOfMessages'])
+    response = sqs_client.get_queue_attributes(QueueUrl=sqs_req_queue.url,AttributeNames=['ApproximateNumberOfMessages'])
     return int(response['Attributes']['ApproximateNumberOfMessages'])
 
 def get_running_instances():
@@ -55,4 +56,4 @@ def auto_scaling():
             terminate_instance(running_instances[0])
 
 if __name__ == "__main__":
-    auto_scaling()
+    Thread(target=auto_scaling, daemon=True).start()
