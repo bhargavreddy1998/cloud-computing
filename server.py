@@ -3,6 +3,7 @@ import boto3
 import json
 from flask import Flask, request
 from threading import Thread
+from controller import auto_scaling
 
 app = Flask(__name__)
 
@@ -66,4 +67,5 @@ def handle_post():
 
 if __name__ == "__main__":
     Thread(target=get_result_resp_queue, daemon=True).start()
+    Thread(target=auto_scaling, daemon=True).start()
     app.run(host="0.0.0.0", port=8000)

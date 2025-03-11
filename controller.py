@@ -3,7 +3,7 @@ from threading import Thread
 
 ASU_ID = "1226491476"
 REGION = 'us-east-1'
-AMI_ID = "ami-04b4f1a9cf54c11d0"
+AMI_ID = "ami-039f4e54cac564526"
 INSTANCE_TYPE = "t2.micro"
 SECURITY_GROUP = "app-tier-sg"
 KEY_NAME = "my-key-pair"
@@ -53,7 +53,4 @@ def auto_scaling():
                 instance_counter += 1
                 launch_instance()
         elif len(running_instances) > 0:
-            terminate_instance(running_instances[0])
-
-if __name__ == "__main__":
-    auto_scaling()
+            terminate_instance(running_instances[0])    
