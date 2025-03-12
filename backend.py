@@ -1,6 +1,7 @@
 import json
 import boto3
 import subprocess
+import os
 ASU_ID = "1226491476"
 SQS_REQ_QUEUE_NAME = f"{ASU_ID}-req-queue"
 SQS_RESP_QUEUE_NAME = f"{ASU_ID}-resp-queue"
@@ -41,6 +42,7 @@ def handle_image(filename):
     filename_no_ext = filename.split(".")[0]
     store_recognition_result(face_reg_result=face_reg_result,filename=filename_no_ext)
     send_reg_result_resp_queue(face_reg_result=face_reg_result,filename=filename)
+    os.remove(file_download_path)
 
 def retrieve_sqs_request():
     while True:
