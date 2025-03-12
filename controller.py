@@ -59,7 +59,7 @@ def launch_instance(instance_number,instancelist):
     )
 
 def terminate_instance(instance_id):
-    ec2.terminate_instances(InstanceIds=[instance_id])
+    ec2.stop_instances(InstanceIds=[instance_id])
 
 def auto_scaling():
     instancelist=get_app_tier_instances()
