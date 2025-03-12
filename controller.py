@@ -43,11 +43,11 @@ def get_app_tier_instances():
     return instances
 
 def launch_instance(instance_number,instancelist):
-    instance_name = f"app-tier-instance-{instance_number}"
-    instance_id=instancelist[instance_number]
-    print(f"Launching instance {instance_name}")
-    print(f"instance id is {instance_id}")
-    print((instancelist[:instance_number-1]))
+    # instance_name = f"app-tier-instance-{instance_number}"
+    # instance_id=instancelist[instance_number]
+    # print(f"Launching instance {instance_name}")
+    # print(f"instance id is {instance_id}")
+    # print((instancelist[:instance_number-1]))
     # ec2.run_instances(ImageId=AMI_ID, InstanceType=INSTANCE_TYPE, MinCount=1, MaxCount=1, KeyName=KEY_NAME, SecurityGroupIds=['sg-054472efd7ae91e49'],
     #     TagSpecifications=[{
     #         'ResourceType': 'instance',
