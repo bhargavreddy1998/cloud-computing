@@ -18,6 +18,8 @@ sqs_req_queue = sqs_resource.get_queue_by_name(QueueName=SQS_REQ_QUEUE_NAME)
 
 def get_message_count():
     response = sqs_client.get_queue_attributes(QueueUrl=sqs_req_queue.url,AttributeNames=['ApproximateNumberOfMessages'])
+    print("response is")
+    print(int(response['Attributes']['ApproximateNumberOfMessages']))
     return int(response['Attributes']['ApproximateNumberOfMessages'])
 
 def get_running_instances():
@@ -25,22 +27,42 @@ def get_running_instances():
         {'Name': 'instance-state-name', 'Values': ['running', 'pending']},
         {'Name': 'tag:Name', 'Values': [f"app-tier-instance-*"]}
     ])
+    print("instances are")
+    print([inst['InstanceId'] for res in response['Reservations'] for inst in res['Instances']])
     instances = [inst['InstanceId'] for res in response['Reservations'] for inst in res['Instances']]
     return instances
 
-def launch_instance(instance_number):
+def get_app_tier_instances():
+    response = ec2.describe_instances(Filters=[
+        {'Name': 'instance-state-name', 'Values': ['running', 'stopped', 'pending']},
+        {'Name': 'tag:Name', 'Values': [f"app-tier-instance-*"]}
+    ])
+    print("instances are")
+    print([inst['InstanceId'] for res in response['Reservations'] for inst in res['Instances']])
+    instances = [inst['InstanceId'] for res in response['Reservations'] for inst in res['Instances']]
+    return instances
+
+def launch_instance(instance_number,instancelist):
     instance_name = f"app-tier-instance-{instance_number}"
-    ec2.run_instances(ImageId=AMI_ID, InstanceType=INSTANCE_TYPE, MinCount=1, MaxCount=1, KeyName=KEY_NAME, SecurityGroups=[SECURITY_GROUP],
-        TagSpecifications=[{
-            'ResourceType': 'instance',
-            'Tags': [{'Key': 'Name', 'Value': instance_name}]
-        }]
+    instance_id=instancelist[instance_number]
+    print(f"Launching instance {instance_name}")
+    print(f"instance id is {instance_id}")
+    print((instancelist[:instance_number]))
+    # ec2.run_instances(ImageId=AMI_ID, InstanceType=INSTANCE_TYPE, MinCount=1, MaxCount=1, KeyName=KEY_NAME, SecurityGroupIds=['sg-054472efd7ae91e49'],
+    #     TagSpecifications=[{
+    #         'ResourceType': 'instance',
+    #         'Tags': [{'Key': 'Name', 'Value': instance_name}]
+    #     }]
+    # )
+    ec2.start_instances(
+    InstanceIds=instancelist[:instance_number]
     )
 
 def terminate_instance(instance_id):
     ec2.terminate_instances(InstanceIds=[instance_id])
 
 def auto_scaling():
+    instancelist=get_app_tier_instances()
     instance_counter = 0
     while True:
         message_count = get_message_count()
@@ -48,9 +70,9 @@ def auto_scaling():
         if message_count > 0:
             if len(running_instances) == 0:
                 instance_counter += 1
-                launch_instance(instance_counter)
+                launch_instance(instance_counter,instancelist)
             elif len(running_instances) < min(message_count, MAX_INSTANCES):
                 instance_counter += 1
-                launch_instance()
+                launch_instance(instance_counter,instancelist)
         elif len(running_instances) > 0:
             terminate_instance(running_instances[0])    
