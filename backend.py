@@ -15,8 +15,6 @@ s3_client = boto3.client("s3", region_name=REGION)
 sqs_resp_queue = sqs_resource.get_queue_by_name(QueueName=SQS_RESP_QUEUE_NAME)
 sqs_req_queue = sqs_resource.get_queue_by_name(QueueName=SQS_REQ_QUEUE_NAME)
 
-face_recognition_path = "/Users/bhargavreddy/Downloads/Cloud-Computing/Project-1-part-2/face-reg/CSE546-SPRING-2025/face_recognition.py" 
-
 def model_inference_face_recognition(file_download_path):
     command = "python3 " + "face_recognition.py" + " " + file_download_path
     print("command is "+command)
