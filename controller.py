@@ -71,7 +71,7 @@ python3 backend.py > /home/ubuntu/backend.log 2>&1
     # )
 
 def terminate_instance(instance_id):
-    ec2.stop_instances(InstanceIds=[instance_id])
+     ec2.stop_instances(InstanceIds=instance_id)
 
 def auto_scaling():
     instancelist=get_app_tier_instances()
