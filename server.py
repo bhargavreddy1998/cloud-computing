@@ -24,11 +24,11 @@ face_reg_dict = dict()
 def send_filename_req_queue(filename):
     message_body = json.dumps({"filename": filename})
     sqs_req_queue.send_message( MessageBody=message_body)
-    # print(f"Sent {filename} to request queue")
+    print(f"Sent {filename} to request queue")
 
 def store_image_in_s3(file_obj, filename):
     s3_client.upload_fileobj(file_obj, S3_BUCKET_NAME, filename)
-    # print(f"Uploaded {filename} to S3 bucket")
+    print(f"Uploaded {filename} to S3 bucket")
 
 def get_result_resp_queue():
     while True:
@@ -37,15 +37,21 @@ def get_result_resp_queue():
         for message in messages:
             try:
                 msg_body = json.loads(message['Body'])
-                # print(f"Received message: {msg_body}")
+                print(f"Received message: {msg_body}")
                 filename = msg_body["filename"]
-                # print(f"Received result for {filename}")
-                # print(f"Result: {msg_body['result'].strip()}")
+                print(f"Received result for {filename}")
+                print(f"Result: {msg_body['result'].strip()}")
                 face_reg_dict[filename.split('.')[0]] = msg_body["result"].strip() 
                 sqs_client.delete_message(QueueUrl=sqs_resp_queue.url, ReceiptHandle=message['ReceiptHandle'])
-                # print(face_reg_dict)
+                print(face_reg_dict)
             except Exception as e:
                 print(f"Error processing message: {e}")
+
+def poll_for_result(filename):
+    while True:
+        if filename.split(".")[0] in face_reg_dict:
+             return f"{filename}:{face_reg_dict.pop(filename.split(".")[0])}\n", 200
+        time.sleep(1)
 
 @app.route("/", methods=["POST"])
 def handle_post():
@@ -57,16 +63,13 @@ def handle_post():
     try:
         send_filename_req_queue(filename=filename)
         store_image_in_s3(file_obj=file_obj, filename=filename)
-        # print(filename_no_ext in face_reg_dict)
-        for _ in range(10):
-            if filename_no_ext in face_reg_dict:
-                return f"{filename}:{face_reg_dict.pop(filename_no_ext)}\n", 200
-            time.sleep(1)
-        return "File processed\n", 200
+        print(filename_no_ext in face_reg_dict)
+        return poll_for_result(filename_no_ext)
+        # return "File processed\n", 200
     except Exception as e:
         return f"Error processing the request: {str(e)}\n", 500
 
 if __name__ == "__main__":
     Thread(target=get_result_resp_queue, daemon=True).start()
-    Thread(target=auto_scaling, daemon=True).start()
+    # Thread(target=auto_scaling, daemon=True).start()
     app.run(host="0.0.0.0", port=8000)
