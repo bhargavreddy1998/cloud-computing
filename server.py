@@ -3,7 +3,7 @@ import boto3
 import json
 from flask import Flask, request
 from threading import Thread
-from controller import auto_scaling
+from controller import monitor_request_queue
 
 app = Flask(__name__)
 
