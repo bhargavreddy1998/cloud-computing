@@ -57,7 +57,7 @@ def handle_post():
     try:
         send_filename_req_queue(filename=filename)
         store_image_in_s3(file_obj=file_obj, filename=filename)
-        print(filename_no_ext in face_reg_dict)
+        # print(filename_no_ext in face_reg_dict)
         for _ in range(10):
             if filename_no_ext in face_reg_dict:
                 return f"{filename}:{face_reg_dict.pop(filename_no_ext)}\n", 200
