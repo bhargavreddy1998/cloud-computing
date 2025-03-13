@@ -62,6 +62,7 @@ def handle_post():
             if filename_no_ext in face_reg_dict:
                 return f"{filename}:{face_reg_dict.pop(filename_no_ext)}\n", 200
             time.sleep(1)
+        return "File processed\n", 200
     except Exception as e:
         return f"Error processing the request: {str(e)}\n", 500
 
