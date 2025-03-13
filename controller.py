@@ -1,93 +1,87 @@
 import boto3
 import time
-REGION = 'us-east-1' 
-INSTANCE_TYPE = 't2.micro'  
-AMI_ID = "ami-096cfbd50c624de78"
-sqs = boto3.client('sqs', region_name=REGION)
-ec2 = boto3.resource('ec2', region_name=REGION)
+import logging
+
+# AWS credentials and region
+AWS_ACCESS_KEY = 'AKIA2ZIONKBBLZXMYLOG'
+AWS_SECRET_KEY = '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'
+REGION = 'us-east-1'
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+# SQS queue names
+REQUEST_QUEUE = 'https://sqs.us-east-1.amazonaws.com/741448962114/1226491476-req-queue'
+
+# EC2 instance settings
+APP_TIER_INSTANCE_TYPE = 't2.micro'
+APP_TIER_AMI_ID = 'ami-04b4f1a9cf54c11d0'
 MAX_INSTANCES = 15
-SCALE_OUT_THRESHOLD = 1
-MIN_INSTANCES = 0 
-COOLDOWN_PERIOD = 45
-INSTANCE_ID_COUNTER = 0
 
-def get_app_instances():
-    instances = ec2.instances.filter(
-        Filters=[
-            {'Name': 'tag:Name', 'Values': ['app-tier-instance-*']},
-            {'Name': 'instance-state-name', 'Values': ['running', 'pending']}
-        ]
-    )
-    return list(instances)
+# Initialize AWS clients
+sqs = boto3.client('sqs', aws_access_key_id=AWS_ACCESS_KEY, aws_secret_access_key=AWS_SECRET_KEY, region_name=REGION)
+ec2 = boto3.client('ec2', aws_access_key_id=AWS_ACCESS_KEY, aws_secret_access_key=AWS_SECRET_KEY, region_name=REGION)
 
-def get_pending_requests():
-    response = sqs.get_queue_attributes(
-        QueueUrl='https://sqs.us-east-1.amazonaws.com/741448962114/1226491476-req-queue',
-        AttributeNames=['ApproximateNumberOfMessages']
-    )
-    return int(response['Attributes'].get('ApproximateNumberOfMessages', 0))
-def scale_in():
-    instances = get_app_instances()
-    if len(instances) > MIN_INSTANCES:
-        instance_to_terminate = instances[-1]
-        instance_name = None
-        if instance_to_terminate.tags:
-            for tag in instance_to_terminate.tags:
-                if tag['Key'] == 'Name':
-                    instance_name = tag['Value']
-                    break
-        instance_to_terminate.terminate()
-        print(f"Terminated EC2 instance: {instance_to_terminate.id}, Name: {instance_name or 'N/A'}")
+def get_pending_messages():
+    """Get the number of pending messages in the SQS request queue."""
+    response = sqs.get_queue_attributes(QueueUrl=REQUEST_QUEUE, AttributeNames=['ApproximateNumberOfMessages'])
+    return int(response['Attributes']['ApproximateNumberOfMessages'])
 
-def scale_out():
-    global INSTANCE_ID_COUNTER
-    INSTANCE_ID_COUNTER += 1
+def get_stopped_instance_ids():
+    """Get the IDs of stopped app-tier instances."""
+    response = ec2.describe_instances(Filters=[
+        {'Name': 'instance-state-name', 'Values': ['stopped']},
+        {'Name': 'tag:Name', 'Values': ['app-tier-instance-*']}
+    ])
+    instance_ids = []
+    for reservation in response['Reservations']:
+        for instance in reservation['Instances']:
+            instance_ids.append(instance['InstanceId'])
+    return instance_ids
 
-    current_instances = get_app_instances()
-    if len(current_instances) < MAX_INSTANCES:
-        instance_name = f'app-tier-instance-{INSTANCE_ID_COUNTER}'
-        instance = ec2.create_instances(
-            ImageId=AMI_ID,
-            InstanceType=INSTANCE_TYPE,
-            MinCount=1,
-            MaxCount=1,
-            KeyName='my-key-pair', 
-            SecurityGroupIds=['sg-054472efd7ae91e49'],
-            TagSpecifications=[{
-                'ResourceType': 'instance',
-                'Tags': [{'Key': 'Name', 'Value': instance_name}]
-            }],
-            UserData='''#!/bin/bash
-            cd /home/ubuntu/CSE546-SPRING-2025
-            python3 backend.py > /home/ubuntu/backend.log 2>&1 &
-            '''
-        )
-        print(f"Launched new instance: {instance[0].id} with name {instance_name}")
-def monitor_request_queue():
-    global INSTANCE_ID_COUNTER
-    global results
-    pending_requests_zero_since = None
+def start_instances(instance_ids):
+    """Start the specified instances."""
+    if instance_ids:
+        ec2.start_instances(InstanceIds=instance_ids)
+        logging.info(f"Started instances: {instance_ids}")
+
+def stop_instances(instance_ids):
+    """Stop the specified instances."""
+    if instance_ids:
+        ec2.stop_instances(InstanceIds=instance_ids)
+        logging.info(f"Stopped instances: {instance_ids}")
+
+def main():
+    """Main loop to monitor the SQS queue and scale instances."""
     while True:
-        global INSTANCE_ID_COUNTER
-        pending_requests = get_pending_requests()
-        current_instance_count = len(get_app_instances())
-        upper_limit = min(MAX_INSTANCES,pending_requests)
-        if pending_requests > 0:
-            pending_requests_zero_since = None
-            if pending_requests > SCALE_OUT_THRESHOLD and  INSTANCE_ID_COUNTER < upper_limit:
-                scale_out()
-            
-        else:
-            if pending_requests_zero_since is None:
-                pending_requests_zero_since = time.time()
-            else:
-                time_since_zero = time.time() - pending_requests_zero_since
-                if time_since_zero >= COOLDOWN_PERIOD:
-                    if current_instance_count > MIN_INSTANCES:
-                        instances_to_terminate = current_instance_count - MIN_INSTANCES
-                        for _ in range(instances_to_terminate):
-                            scale_in()
-                            time.sleep(2)
-                        INSTANCE_ID_COUNTER = 0
-                        results = {}
-        time.sleep(1)
+        try:
+            # Get the number of pending messages
+            pending_messages = get_pending_messages()
+            logging.info(f"Pending messages: {pending_messages}")
+
+            # Calculate the desired number of instances
+            desired_instances = min(pending_messages, MAX_INSTANCES)
+            logging.info(f"Desired instances: {desired_instances}")
+
+            # Get the current number of running instances
+            running_instances = ec2.describe_instances(Filters=[
+                {'Name': 'instance-state-name', 'Values': ['running', 'pending']},
+                {'Name': 'tag:Name', 'Values': ['app-tier-instance-*']}
+            ])
+            running_count = len(running_instances['Reservations'])
+
+            # Start or stop instances as needed
+            if desired_instances > running_count:
+                stopped_instance_ids = get_stopped_instance_ids()
+                num_to_start = min(desired_instances - running_count, len(stopped_instance_ids))
+                start_instances(stopped_instance_ids[:num_to_start])
+            elif desired_instances < running_count:
+                running_instance_ids = [instance['InstanceId'] for reservation in running_instances['Reservations'] for instance in reservation['Instances']]
+                num_to_stop = running_count - desired_instances
+                stop_instances(running_instance_ids[:num_to_stop])
+
+            # Wait before checking again
+            time.sleep(10)
+        except Exception as e:
+            logging.error(f"Error in main loop: {e}")
+
+if __name__ == '__main__':
+    main()
