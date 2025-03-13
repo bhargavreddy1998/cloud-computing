@@ -9,6 +9,7 @@ MAX_INSTANCES = 15
 SCALE_OUT_THRESHOLD = 1
 MIN_INSTANCES = 0 
 COOLDOWN_PERIOD = 45
+INSTANCE_ID_COUNTER = 0
 
 def get_app_instances():
     instances = ec2.instances.filter(
