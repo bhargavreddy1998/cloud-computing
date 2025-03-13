@@ -139,7 +139,7 @@ def auto_scaling():
                 to_stop = running_count - desired_count
                 stop_app_tier_instances(running_ids[:to_stop])
 
-            time.sleep(3)
+            time.sleep(1)
 
         except Exception as e:
             print(f"[auto_scaling] Error: {str(e)}")
