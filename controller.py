@@ -1,146 +1,92 @@
 import boto3
 import time
-import threading
-
-ASU_ID = "1226491476"
-REGION = 'us-east-1'
+REGION = 'us-east-1' 
+INSTANCE_TYPE = 't2.micro'  
 AMI_ID = "ami-096cfbd50c624de78"
-INSTANCE_TYPE = "t2.micro"
-SECURITY_GROUP_ID = "sg-054472efd7ae91e49"
-KEY_NAME = "my-key-pair"
+sqs = boto3.client('sqs', region_name=REGION)
+ec2 = boto3.resource('ec2', region_name=REGION)
 MAX_INSTANCES = 15
+SCALE_OUT_THRESHOLD = 1
+MIN_INSTANCES = 0 
+COOLDOWN_PERIOD = 45
 
-sqs_client = boto3.client("sqs", region_name=REGION)
-sqs_resource = boto3.resource("sqs", region_name=REGION)
-ec2 = boto3.client("ec2", region_name=REGION)
+def get_app_instances():
+    instances = ec2.instances.filter(
+        Filters=[
+            {'Name': 'tag:Name', 'Values': ['app-tier-instance-*']},
+            {'Name': 'instance-state-name', 'Values': ['running', 'pending']}
+        ]
+    )
+    return list(instances)
 
-SQS_REQ_QUEUE_NAME = f"{ASU_ID}-req-queue"
-sqs_req_queue = sqs_resource.get_queue_by_name(QueueName=SQS_REQ_QUEUE_NAME)
-
-# Global counter to name each instance
-instance_counter = 1
-counter_lock = threading.Lock()
-
-def get_message_count():
-    response = sqs_client.get_queue_attributes(
-        QueueUrl=sqs_req_queue.url,
+def get_pending_requests():
+    response = sqs.get_queue_attributes(
+        QueueUrl='https://sqs.us-east-1.amazonaws.com/741448962114/1226491476-req-queue',
         AttributeNames=['ApproximateNumberOfMessages']
     )
     return int(response['Attributes'].get('ApproximateNumberOfMessages', 0))
+def scale_in():
+    instances = get_app_instances()
+    if len(instances) > MIN_INSTANCES:
+        instance_to_terminate = instances[-1]
+        instance_name = None
+        if instance_to_terminate.tags:
+            for tag in instance_to_terminate.tags:
+                if tag['Key'] == 'Name':
+                    instance_name = tag['Value']
+                    break
+        instance_to_terminate.terminate()
+        print(f"Terminated EC2 instance: {instance_to_terminate.id}, Name: {instance_name or 'N/A'}")
 
-def get_running_instances():
-    # We look for either running or pending, named app-tier-instance-*
-    response = ec2.describe_instances(
-        Filters=[
-            {'Name': 'instance-state-name', 'Values': ['running','pending']},
-            {'Name': 'tag:Name', 'Values': ["app-tier-instance-*"]}
-        ]
-    )
-    instance_ids = []
-    for reservation in response['Reservations']:
-        for inst in reservation['Instances']:
-            instance_ids.append(inst['InstanceId'])
-    return instance_ids
+def scale_out():
+    global INSTANCE_ID_COUNTER
+    INSTANCE_ID_COUNTER += 1
 
-def get_stopped_instances():
-    # We look for "stopped" specifically, named app-tier-instance-*
-    response = ec2.describe_instances(
-        Filters=[
-            {'Name': 'instance-state-name', 'Values': ['stopped']},
-            {'Name': 'tag:Name', 'Values': ["app-tier-instance-*"]}
-        ]
-    )
-    instance_ids = []
-    for reservation in response['Reservations']:
-        for inst in reservation['Instances']:
-            instance_ids.append(inst['InstanceId'])
-    return instance_ids
-
-def start_app_tier_instances(count):
-    """
-    Start 'count' app-tier instances:
-      1) Reuse as many stopped instances as possible.
-      2) If not enough stopped, launch new ones (each with a unique name).
-    """
-    if count <= 0:
-        return
-
-    stopped_list = get_stopped_instances()
-    stopped_count = len(stopped_list)
-
-    if stopped_count == 0:
-        # All new
-        run_new_instances(count)
-    else:
-        if stopped_count >= count:
-            to_start = stopped_list[:count]
-            ec2.start_instances(InstanceIds=to_start)
-        else:
-            # Start all stopped
-            ec2.start_instances(InstanceIds=stopped_list)
-            remainder = count - stopped_count
-            run_new_instances(remainder)
-
-def run_new_instances(count):
-    """
-    Launch 'count' brand-new instances, each with a unique Name like 
-    'app-tier-instance-<instance#>', and a user data script that runs backend.py.
-    """
-    global instance_counter
-
-    user_data_script = """#!/bin/bash
-cd /home/ubuntu/CSE546-SPRING-2025
-python3 backend.py > /home/ubuntu/backend.log 2>&1
-"""
-
-    for _ in range(count):
-        with counter_lock:
-            name_tag = f"app-tier-instance-{instance_counter}"
-            instance_counter += 1
-
-        # Launch 1 instance at a time with the unique name
-        response = ec2.run_instances(
+    current_instances = get_app_instances()
+    if len(current_instances) < MAX_INSTANCES:
+        instance_name = f'app-tier-instance-{INSTANCE_ID_COUNTER}'
+        instance = ec2.create_instances(
             ImageId=AMI_ID,
             InstanceType=INSTANCE_TYPE,
             MinCount=1,
             MaxCount=1,
-            KeyName=KEY_NAME,
-            SecurityGroupIds=[SECURITY_GROUP_ID],
+            KeyName='my-key-pair', 
+            SecurityGroupIds=['sg-054472efd7ae91e49'],
             TagSpecifications=[{
                 'ResourceType': 'instance',
-                'Tags': [{'Key': 'Name', 'Value': name_tag}]
+                'Tags': [{'Key': 'Name', 'Value': instance_name}]
             }],
-            UserData=user_data_script
+            UserData='''#!/bin/bash
+            cd /home/ubuntu/CSE546-SPRING-2025
+            python3 backend.py > /home/ubuntu/backend.log 2>&1 &
+            '''
         )
-        # Optionally, capture response['Instances'][0]['InstanceId'] if you want to track them.
-
-def stop_app_tier_instances(instance_ids):
-    if not instance_ids:
-        return
-    ec2.stop_instances(InstanceIds=instance_ids)
-
-def auto_scaling():
-    """
-    Continuously monitors the queue and scales app-tier up/down 
-    so that # running == min(# messages, MAX_INSTANCES).
-    """
+        print(f"Launched new instance: {instance[0].id} with name {instance_name}")
+def monitor_request_queue():
+    global INSTANCE_ID_COUNTER
+    global results
+    pending_requests_zero_since = None
     while True:
-        try:
-            msg_count = get_message_count()
-            running_ids = get_running_instances()
-            running_count = len(running_ids)
-
-            desired_count = min(msg_count, MAX_INSTANCES)
-
-            if desired_count > running_count:
-                start_app_tier_instances(desired_count - running_count)
-
-            elif desired_count < running_count:
-                to_stop = running_count - desired_count
-                stop_app_tier_instances(running_ids[:to_stop])
-
-            time.sleep(3)
-
-        except Exception as e:
-            print(f"[auto_scaling] Error: {str(e)}")
-            time.sleep(5)
+        global INSTANCE_ID_COUNTER
+        pending_requests = get_pending_requests()
+        current_instance_count = len(get_app_instances())
+        upper_limit = min(MAX_INSTANCES,pending_requests)
+        if pending_requests > 0:
+            pending_requests_zero_since = None
+            if pending_requests > SCALE_OUT_THRESHOLD and  INSTANCE_ID_COUNTER < upper_limit:
+                scale_out()
+            
+        else:
+            if pending_requests_zero_since is None:
+                pending_requests_zero_since = time.time()
+            else:
+                time_since_zero = time.time() - pending_requests_zero_since
+                if time_since_zero >= COOLDOWN_PERIOD:
+                    if current_instance_count > MIN_INSTANCES:
+                        instances_to_terminate = current_instance_count - MIN_INSTANCES
+                        for _ in range(instances_to_terminate):
+                            scale_in()
+                            time.sleep(2)
+                        INSTANCE_ID_COUNTER = 0
+                        results = {}
+        time.sleep(1)
