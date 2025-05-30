@@ -65,7 +65,6 @@ def handle_post():
         store_image_in_s3(file_obj=file_obj, filename=filename)
         print(filename_no_ext in face_reg_dict)
         return poll_for_result(filename_no_ext)
-        # return "File processed\n", 200
     except Exception as e:
         return f"Error processing the request: {str(e)}\n", 500
 
