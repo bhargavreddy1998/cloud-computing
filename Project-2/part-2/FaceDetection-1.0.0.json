@@ -1,0 +1,44 @@
+{
+  "RecipeFormatVersion": "2020-01-25",
+  "ComponentName": "com.clientdevices.FaceDetection",
+  "ComponentVersion": "1.0.0",
+  "ComponentDescription": "My first AWS IoT Greengrass component.",
+  "ComponentPublisher": "Amazon",
+  "ComponentConfiguration": {
+    "DefaultConfiguration": {
+      "accessControl": {
+        "aws.greengrass.ipc.pubsub": {
+          "com.clientdevices.FaceDetection:pubsub:1": {
+            "policyDescription": "Allows access to subscribe to all topics.",
+            "operations": [
+              "aws.greengrass#SubscribeToTopic",
+              "aws.greengrass#PublishToIoTCore"
+            ],
+            "resources": [
+              "*"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "Manifests": [
+    {
+      "Platform": {
+        "os": "linux"
+      },
+      "Lifecycle": {
+        "install":"python3 -m pip install --no-cache-dir --user awsiotsdk boto3 numpy==1.24.4 torch==1.9.1+cpu torchvision==0.10.1+cpu torchaudio==0.9.1 --extra-index-url https://download.pytorch.org/whl/cpu",
+        "run": "python3 -u {artifacts:path}/fd_component.py {configuration:/Message}"
+      }
+    },
+    {
+      "Platform": {
+        "os": "windows"
+      },
+      "Lifecycle": {
+        "run": "py -3 -u {artifacts:path}/fd_component.py {configuration:/Message}"
+      }
+    }
+  ]
+}
