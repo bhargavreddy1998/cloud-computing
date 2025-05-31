@@ -10,7 +10,7 @@ from facenet_pytorch import InceptionResnetV1
 
 
 sqs = boto3.client('sqs')
-RESPONSE_QUEUE_URL = 'https://sqs.us-east-1.amazonaws.com/879381261134/1226491476-resp-queue'
+RESPONSE_QUEUE_URL = ''
 resnet = InceptionResnetV1(pretrained='vggface2').eval()
 saved_data = torch.load("/var/task/resnetV1_video_weights.pt")
 embedding_list = saved_data[0]
