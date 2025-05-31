@@ -13,9 +13,9 @@ from facenet_pytorch import MTCNN
 
 seen_requests = set()
 mtcnn = MTCNN(image_size=240, margin=0, min_face_size=20)
-sqs = boto3.client(service_name='sqs',region_name="us-east-1",aws_access_key_id="AKIA4ZPZVFNHGN37TF4P",aws_secret_access_key="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")
-REQUEST_QUEUE_URL="https://sqs.us-east-1.amazonaws.com/879381261134/1226491476-req-queue"
-RESPONSE_QUEUE_URL="https://sqs.us-east-1.amazonaws.com/879381261134/1226491476-resp-queue"
+sqs = boto3.client(service_name='sqs',region_name="us-east-1",aws_access_key_id="",aws_secret_access_key="")
+REQUEST_QUEUE_URL=""
+RESPONSE_QUEUE_URL=""
 def handle_requests(event):
     try:
         body=json.loads(event.binary_message.message)
