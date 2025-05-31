@@ -8,7 +8,7 @@ from facenet_pytorch import MTCNN
 import io
 
 sqs = boto3.client('sqs')
-REQUEST_QUEUE_URL = 'https://sqs.us-east-1.amazonaws.com/879381261134/1226491476-req-queue'
+REQUEST_QUEUE_URL = ''
 mtcnn = MTCNN(image_size=240, margin=0, min_face_size=20) 
 
 def lambda_handler(event, context):
